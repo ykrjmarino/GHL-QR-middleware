@@ -2,6 +2,15 @@
 // import bcrypt from 'bcryptjs';
 // import { logAction } from '../../utils/logAction.js';
 import QRCode from 'qrcode';
+import { db } from './db.js';
+
+
+export const dbTesting = async (req, res) => {
+  const [rows] = await db.query("SELECT * FROM tickets");
+  console.log(rows);
+  
+  return res.json(rows);
+}
 
 export const generateQR = async (req, res) => {
   console.log("Received ticket data");
