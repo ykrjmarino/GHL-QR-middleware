@@ -1,7 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { dbTesting, generateQR } from './QR.js';
+import { dbTesting, createTicket } from './controllers/ticketController.js';
 
 dotenv.config(); 
 
@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/dbtest', dbTesting);
-app.post('/ticket/generate', generateQR);
+app.post('/ticket/generate', createTicket);
 
 
 app.get("/", (req, res) => res.send("Backend is running QR proj"));
