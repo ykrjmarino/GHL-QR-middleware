@@ -7,4 +7,5 @@ build/
 .env.local
 
 tokens.json
+ticketing-pro-firebase.json
 server copy.js

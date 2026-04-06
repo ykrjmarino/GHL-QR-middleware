@@ -1,7 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { dbTesting, createTicket } from './controllers/ticketController.js';
+import { dbTesting, createTicket, testFirebase } from './ticketController.js';
 
 dotenv.config(); 
 
@@ -12,6 +12,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/dbtest', dbTesting);
+app.get('/firebase-test', testFirebase);
+
 app.post('/ticket/generate', createTicket);
 
 
