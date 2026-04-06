@@ -12,6 +12,7 @@ export const dbTesting = async (req, res) => {
   return res.json(rows);
 }
 
+//==============================================================
 export const testFirebase = async (req, res) => {
   const [files] = await bucket.getFiles();
   console.log(files);
@@ -48,6 +49,40 @@ export const createTicket = async (req, res) => {
   }
 };
 
+//==============================================================
+export const verifyTicket = async (req, res) => { 
+  try {
+    const { ticket_id } = req.body;
+
+    const [rows] = await db.query(
+      "SELECT * FROM tickets WHERE ticket_id = ?",
+      [ticket_id]
+    );
+
+    if (rows.length === 0) {
+      return res.json({ valid: false, message: "Ticket not found" });
+    }
+
+    const ticket = rows[0];
+
+    if (ticket.status === "used") {
+      return res.json({ valid: false, message: "Ticket already used" });
+    }
+
+    // mark as used
+    await db.query(
+      "UPDATE tickets SET status = 'used' WHERE ticket_id = ?",
+      [ticket_id]
+    );
+
+    return res.json({ valid: true, message: "Ticket valid" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+//not yet tested
 export const uploadQR = async (buffer, fileName) => {
   const file = bucket.file(`qr/${fileName}.png`);
 
