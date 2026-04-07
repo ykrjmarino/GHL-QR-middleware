@@ -9,5 +9,6 @@ CREATE TABLE tickets (
   event_id INT NOT NULL,
   status VARCHAR(20) DEFAULT 'unused',
   qr_url VARCHAR(255),
+  expires_at DATETIME,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

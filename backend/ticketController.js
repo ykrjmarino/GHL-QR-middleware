@@ -63,26 +63,10 @@ export const createTicket = async (req, res) => {
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //==============================================================
-export const verifyTicket = async (req, res) => { 
+export const verifyTicket = async (req, res) => { //takes ticket_id and event_id
   try {
-    const { ticket_id } = req.body;
+    const { ticket_id, event_id } = req.body;
 
     const [rows] = await db.query(
       "SELECT * FROM tickets WHERE ticket_id = ?",
@@ -94,10 +78,13 @@ export const verifyTicket = async (req, res) => {
     }
 
     const ticket = rows[0];
+    const now = new Date();
 
-    if (ticket.status === "used") {
-      return res.json({ valid: false, message: "Ticket already used" });
-    }
+    if (ticket.expires_at && new Date(ticket.expires_at) < now) return res.json({ valid: false, message: "Ticket expired" });
+
+    if (ticket.event_id !== Number(event_id)) return res.json({ valid: false, message: "Wrong event" });
+
+    if (ticket.status === "used") return res.json({ valid: false, message: "Ticket already used" });
 
     // mark as used
     await db.query(
