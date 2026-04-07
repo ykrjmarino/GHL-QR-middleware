@@ -1,5 +1,4 @@
 import express from 'express';
-import axios from 'axios';
 import dotenv from 'dotenv';
 import { dbTesting, createTicket, verifyTicket } from './ticketController.js';
 
@@ -10,6 +9,7 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
 
 app.get('/dbtest', dbTesting);
 
