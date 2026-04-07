@@ -1,7 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { dbTesting, createTicket, testFirebase, verifyTicket } from './ticketController.js';
+import { dbTesting, createTicket, verifyTicket } from './ticketController.js';
 
 dotenv.config(); 
 
@@ -12,7 +12,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/dbtest', dbTesting);
-app.get('/firebase-test', testFirebase);
 
 app.post('/ticket/generate', createTicket); //create ticket and generate QR code
 app.post("/ticket/verify", verifyTicket); //verify if valid and used

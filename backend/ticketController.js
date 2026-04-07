@@ -1,7 +1,6 @@
 import { db } from './db.js';
 import QRCode from "qrcode";
 import { nanoid } from 'nanoid';
-import { bucket } from './firebase.js';
 
 //==============================================================
 //GET 
@@ -11,13 +10,6 @@ export const dbTesting = async (req, res) => {
 
   return res.json(rows);
 }
-
-//==============================================================
-export const testFirebase = async (req, res) => {
-  const [files] = await bucket.getFiles();
-  console.log(files);
-  res.send("Firebase connected");
-};
 
 //==============================================================
 //POST
@@ -80,22 +72,4 @@ export const verifyTicket = async (req, res) => {
     console.error(error);
     return res.status(500).json({ message: "Server error" });
   }
-};
-
-//not yet tested
-export const uploadQR = async (buffer, fileName) => {
-  const file = bucket.file(`qr/${fileName}.png`);
-
-  await file.save(buffer, {
-    metadata: {
-      contentType: "image/png",
-    },
-  });
-
-  // make it public
-  await file.makePublic();
-
-  const publicUrl = `https://storage.googleapis.com/${bucket.name}/qr/${fileName}.png`;
-
-  return publicUrl;
 };
