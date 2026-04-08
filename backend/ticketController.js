@@ -24,9 +24,7 @@ export const createTicket = async (req, res) => {
   console.log("Received ticket data");
 
   try {
-    const ticket = req.body.data;
-    //const ticket_id = ticket.ticket_id;
-    const event_id = ticket.event_id;
+    const { event_id } = req.body.data;
 
     const ticket_id = `TKT-${nanoid(8)}`;
 
@@ -66,7 +64,7 @@ export const createTicket = async (req, res) => {
 //==============================================================
 export const verifyTicket = async (req, res) => { //takes ticket_id and event_id
   try {
-    const { ticket_id, event_id } = req.body;
+    const { ticket_id, event_id } = req.body.data;
 
     const [rows] = await db.query(
       "SELECT * FROM tickets WHERE ticket_id = ?",

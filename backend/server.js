@@ -14,7 +14,7 @@ app.use(express.static("public"));
 app.get('/dbtest', dbTesting);
 
 app.post('/ticket/generate', createTicket); //create ticket and generate QR code
-app.post("/ticket/verify", verifyTicket); //verify if valid and used
+app.post('/ticket/verify', verifyTicket); //verify if valid and used
 
 
 app.get("/", (req, res) => res.send("Backend is running QR proj"));
