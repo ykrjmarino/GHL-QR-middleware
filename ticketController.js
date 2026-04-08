@@ -1,9 +1,18 @@
-import { db } from './db.js';
-import dotenv from 'dotenv';
-import QRCode from "qrcode";
-import { nanoid } from 'nanoid';
-import fs from "fs";
-import path from "path";
+// import { db } from './db.js';
+// import dotenv from 'dotenv';
+// import QRCode from "qrcode";
+// import { nanoid } from 'nanoid';
+// import fs from "fs";
+// import path from "path";
+
+// dotenv.config();
+
+const { db } = require('./db');
+const dotenv = require('dotenv');
+const QRCode = require("qrcode");
+const { nanoid } = require('nanoid');
+const fs = require("fs");
+const path = require("path");
 
 dotenv.config();
 
@@ -11,7 +20,7 @@ const port = process.env.PORT || 3000;
 
 //==============================================================
 //GET 
-export const dbTesting = async (req, res) => {
+const dbTesting= async (req, res) => {
   const [rows] = await db.query("SELECT * FROM tickets");
   console.log(rows);
 
@@ -20,7 +29,7 @@ export const dbTesting = async (req, res) => {
 
 //==============================================================
 //POST
-export const createTicket = async (req, res) => {
+const createTicket = async (req, res) => {
   console.log("Received ticket data");
 
   try {
@@ -62,7 +71,7 @@ export const createTicket = async (req, res) => {
 
 
 //==============================================================
-export const verifyTicket = async (req, res) => { //takes ticket_id and event_id
+const verifyTicket= async (req, res) => { //takes ticket_id and event_id
   try {
     const { ticket_id, event_id } = req.body.data;
 
@@ -95,4 +104,11 @@ export const verifyTicket = async (req, res) => { //takes ticket_id and event_id
     console.error(error);
     return res.status(500).json({ message: "Server error" });
   }
+};
+
+
+module.exports = {
+  dbTesting,
+  createTicket,
+  verifyTicket
 };

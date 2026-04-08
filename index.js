@@ -1,8 +1,8 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import { dbTesting, createTicket, verifyTicket } from './ticketController.js';
+const express = require('express');
+const dotenv = require('dotenv');
+const { dbTesting, createTicket, verifyTicket } = require('./ticketController');
 
-dotenv.config(); 
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;

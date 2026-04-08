@@ -1,15 +1,26 @@
-import mysql from "mysql2/promise";
-import dotenv from 'dotenv';
+// import mysql from "mysql2/promise";
+// import dotenv from 'dotenv';
+
+// dotenv.config();
+
+const mysql = require("mysql2/promise");
+const dotenv = require("dotenv");
 
 dotenv.config();
+
 const DB_PASSWORD = process.env.DB_PASSWORD;
 
-export const db = await mysql.createConnection({
+const db = mysql.createConnection({
   host: "127.0.0.1",
   user: "root",
   password: DB_PASSWORD,
   database: "tickets_db",
 });
 
-const [rows] = await db.query("SELECT 1");
-console.log(rows);
+(async () => {
+  const connection = await db;
+  const [rows] = await connection.query("SELECT 1");
+  console.log(rows);
+})();
+
+module.exports = { db };
