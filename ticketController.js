@@ -21,9 +21,10 @@ const port = process.env.PORT || 3000;
 //==============================================================
 //GET 
 const dbTesting= async (req, res) => {
-  const [rows] = await db.query("SELECT * FROM tickets");
-  console.log(rows);
+  const connection = await db;
+  const [rows] = await connection.query("SELECT * FROM tickets");
 
+  console.log(rows);
   return res.json(rows);
 }
 
