@@ -14,17 +14,11 @@ const DB_NAME = process.env.DB_NAME;
 const DB_USER = process.env.DB_USER;
 
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: DB_HOST,
   user: DB_USER,
   password: DB_PASSWORD,
   database: DB_NAME,
 });
-
-(async () => {
-  const connection = await db;
-  const [rows] = await connection.query("SELECT 1");
-  console.log(rows);
-})();
 
 module.exports = { db };
