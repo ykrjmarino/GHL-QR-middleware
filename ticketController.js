@@ -28,6 +28,28 @@ const dbTesting= async (req, res) => {
   return res.json(rows);
 }
 
+const dbNameTesting = async (req, res) => {
+  try {
+    const connection = await db;
+
+    console.log("DB_HOST:", process.env.DB_HOST);
+    console.log("DB_USER:", process.env.DB_USER);
+    console.log("DB_NAME:", process.env.DB_NAME);
+
+    const [rows] = await connection.query("SELECT * FROM tickets");
+
+    console.log("Query success:", rows);
+    return res.json(rows);
+
+  } catch (error) {
+    console.error("DB ERROR:", error);
+    return res.status(500).json({
+      message: "DB error",
+      error: error.message
+    });
+  }
+};
+
 //==============================================================
 //POST
 const createTicket = async (req, res) => {
@@ -109,7 +131,7 @@ const verifyTicket= async (req, res) => { //takes ticket_id and event_id
 
 
 module.exports = {
-  dbTesting,
+  dbTesting, dbNameTesting,
   createTicket,
   verifyTicket
 };

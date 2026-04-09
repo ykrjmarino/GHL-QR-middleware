@@ -1,6 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const { dbTesting, createTicket, verifyTicket } = require('./ticketController');
+const { dbTesting, createTicket, verifyTicket, dbNameTesting } = require('./ticketController');
 
 dotenv.config();
 
@@ -12,6 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 app.get('/dbtest', dbTesting);
+app.get('/dbnametest', dbNameTesting); 
 
 app.post('/ticket/generate', createTicket); //create ticket and generate QR code
 app.post('/ticket/verify', verifyTicket); //verify if valid and used
