@@ -17,6 +17,8 @@ const path = require("path");
 dotenv.config();
 
 const port = process.env.PORT || 3000;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${port}`;
+const FOLDER_URL = process.env.FOLDER_URL || "qr_codes";
 
 //==============================================================
 //GET 
@@ -73,7 +75,7 @@ const createTicket = async (req, res) => {
     const filePath = path.join("public", "qr_codes", `${ticket_id}.png`);
     fs.writeFileSync(filePath, base64Data, "base64"); //decode this base64 string into binary (real image) before saving
 
-    const qr_url = `https://paleturquoise-partridge-765419.hostingersite.com/qr_codes/${ticket_id}.png`;
+    const qr_url = `${BASE_URL}/${FOLDER_URL}/${ticket_id}.png`;
 
     //save to DB    
     await db.query(
