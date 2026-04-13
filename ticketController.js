@@ -54,13 +54,77 @@ const dbNameTesting = async (req, res) => {
 
 //==============================================================
 //POST
-const createTicket = async (req, res) => {
+
+const paymentRecord = async (req, res) => {
+  try {
+    const { ntp_order_ref, ntp_amount, ntp_transaction_ref, ntp_user_id } = req.body.data; //or 'user info' {{contact.id??}} ghl side
+
+    const [existingOrder] = await db.query(
+      "SELECT id FROM orders WHERE order_ref = ?",
+      [ntp_order_ref]
+    );
+
+    let order_id;
+
+    if (existingOrder.length > 0) {
+      order_id = existingOrder[0].id;
+
+      await db.query(
+        "UPDATE orders SET payment_status = 'paid' WHERE id = ?",
+        [order_id]
+      );
+    } else {
+      const [newOrder] = await db.query(
+        `INSERT INTO orders (order_ref, user_id, total_amount, payment_status)
+         VALUES (?, ?, ?, 'paid')`,
+        [ntp_order_ref, ntp_user_id, ntp_amount]
+      );
+
+      order_id = newOrder.insertId; //auto-generated primary key (id)
+    }
+
+    await db.query(
+      `INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref)
+       VALUES (?, ?, ?, 'paid', ?)`,
+      [order_id, ntp_provider, ntp_amount, ntp_transaction_ref]
+    );
+
+    return res.json({
+      message: "Payment recorded",
+      order_id
+    });
+    
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
+
+
+const generateTicket = async (req, res) => {
   console.log("Received ticket data");
 
   try {
-    const { event_id } = req.body.data;
-
+    const { event_id, order_id } = req.body.data;
     const ticket_id = `TKT-${nanoid(8)}`;
+
+    if (!event_id || !order_id) {
+      return res.status(400).json({ message: "Missing event_id or order_id" });
+    }
+
+    const [event] = await db.query("SELECT id FROM events WHERE id = ?", [event_id]);
+    if (event.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+
+
+
+    
 
     //THIS IS THE BASE64... we will convert this to image file and save locally for now
     const qr = await QRCode.toDataURL(ticket_id);
@@ -79,14 +143,15 @@ const createTicket = async (req, res) => {
 
     //save to DB    
     await db.query(
-      "INSERT INTO tickets (ticket_id, event_id, qr_url) VALUES (?, ?, ?)",
-      [ticket_id, event_id, qr_url]
+      "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
+      [ticket_id, order_id, event_id, qr_url]
     );
 
     return res.json({
       ticket_id,
+      order_id,
       event_id,
-      qr_url,
+      qr_url
     });
   } catch (error) {
     console.error(error);
@@ -134,6 +199,7 @@ const verifyTicket= async (req, res) => { //takes ticket_id and event_id
 
 module.exports = {
   dbTesting, dbNameTesting,
-  createTicket,
+  paymentRecord,
+  generateTicket,
   verifyTicket
 };

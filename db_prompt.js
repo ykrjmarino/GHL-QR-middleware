@@ -13,6 +13,12 @@
 //   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 // );
 
+CONTACTS: User must exist first.
+EVENTS: Event must exist.
+ORDERS: Created when user buys something.
+PAYMENTS: Tracks payment record
+TICKETS: Created ONLY after payment is successful.
+
 contacts → orders → payments
                         ↓
                     tickets → events
@@ -57,7 +63,7 @@ CREATE TABLE orders (
 CREATE TABLE tickets (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ticket_id VARCHAR(50) UNIQUE,
-    order_id INT NOT NULL,
+    order_id INT NOT NULL,         -- one or more tickets can link to one order_id
     event_id INT NOT NULL,
     status ENUM('unused', 'used') DEFAULT 'unused',
     qr_url VARCHAR(255),
@@ -76,3 +82,19 @@ CREATE TABLE payments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id)
 );
+
+============== dummy data ==============
+INSERT INTO contacts (name, email, phone)
+VALUES ('Test User', 'test@email.com', '09123456789');
+
+INSERT INTO orders (order_ref, user_id, total_amount, payment_status)
+VALUES ('ORDER-TEST-001', 1, 500.00, 'paid');
+
+http://localhost:8080/ticket/generate
+POST body:
+{
+  "data": {
+    "event_id": 1,
+    "order_id": 1
+  }
+}
