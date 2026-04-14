@@ -54,10 +54,12 @@ CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_ref VARCHAR(50) UNIQUE,
     user_id INT NOT NULL,
+    event_id INT NOT NULL,
     total_amount DECIMAL(10,2),
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES contacts(id)
+    FOREIGN KEY (user_id) REFERENCES contacts(id),
+    FOREIGN KEY (event_id) REFERENCES events(id)
 );
 
 CREATE TABLE tickets (
@@ -84,17 +86,34 @@ CREATE TABLE payments (
 );
 
 ============== dummy data ==============
-INSERT INTO contacts (name, email, phone)
-VALUES ('Test User', 'test@email.com', '09123456789');
+-- 1. contacts first
+INSERT INTO contacts (name, email, phone) VALUES
+('Juan dela Cruz', 'juan@email.com', '09171234567'),
+('Maria Santos', 'maria@email.com', '09281234567'),
+('Pedro Reyes', 'pedro@email.com', '09391234567');
 
-INSERT INTO orders (order_ref, user_id, total_amount, payment_status)
-VALUES ('ORDER-TEST-001', 1, 500.00, 'paid');
+-- 2. events
+INSERT INTO events (event_name, event_date, expires_at, location) VALUES
+('Sinulog Festival Concert', '2025-01-19 18:00:00', '2025-01-19 23:00:00', 'Cebu City Sports Center'),
+('OPM Night Manila', '2025-02-14 19:00:00', '2025-02-14 23:59:00', 'SM Mall of Asia Arena'),
+('Tech Summit PH', '2025-03-10 09:00:00', '2025-03-10 17:00:00', 'PICC, Pasay City');
 
-http://localhost:8080/ticket/generate
-POST body:
-{
-  "data": {
-    "event_id": 1,
-    "order_id": 1
-  }
-}
+-- 3. orders (now includes event_id)
+INSERT INTO orders (order_ref, user_id, event_id, total_amount, payment_status) VALUES
+('ORDER-2025-001', 1, 1, 500.00, 'paid'),
+('ORDER-2025-002', 2, 2, 1000.00, 'paid'),
+('ORDER-2025-003', 3, 3, 1500.00, 'pending');
+
+-- 4. payments
+INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref) VALUES
+(1, 'GCash', 500.00, 'paid', 'GC-TXN-000001'),
+(2, 'Maya', 1000.00, 'paid', 'MY-TXN-000002'),
+(3, 'GCash', 1500.00, 'pending', 'GC-TXN-000003');
+
+-- //no need for this muna
+-- 5. tickets last (only after payment)
+INSERT INTO tickets (ticket_id, order_id, event_id, status, qr_url) VALUES
+('TKT-2025-001', 1, 1, 'unused', 'http://localhost:8080/qr/TKT-2025-001'),
+('TKT-2025-002', 2, 2, 'unused', 'http://localhost:8080/qr/TKT-2025-002'),
+('TKT-2025-003', 2, 2, 'unused', 'http://localhost:8080/qr/TKT-2025-003'),
+('TKT-2025-004', 3, 3, 'unused', 'http://localhost:8080/qr/TKT-2025-004');
