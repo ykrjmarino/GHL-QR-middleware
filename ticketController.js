@@ -115,11 +115,7 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
   }
 };
 
-
-
 const generateTicket = async (req, res) => {
-  console.log("Received ticket data");
-
   try {
     const { ntp_event_id, ntp_order_id } = req.body.data;
 
@@ -181,6 +177,77 @@ const generateTicket = async (req, res) => {
   }
 };
 
+const batchGenerateTicket = async (req, res) => {
+  try {
+    const { ntp_event_id, ntp_order_id } = req.body.data;
+    const { ntp_quantity } = req.body.data; // kahit di na siguro
+
+    //check if data passed from req.body.data is existing
+    if (!ntp_event_id || !ntp_order_id) {
+      return res.status(400).json({ message: "Missing ntp_event_id or ntp_order_id" });
+    }
+
+    const [order] = await db.query(
+      "SELECT payment_status FROM orders WHERE id = ?",
+      [ntp_order_id]
+    );
+
+    const [[ ticketCount ]] = await db.query(
+      "SELECT COUNT (*) as count FROM payments WHERE order_id = ?",
+      [ntp_order_id]
+    );
+
+    const [[ existing ]] = await db.query(
+      "SELECT COUNT (*) as count FROM payments WHERE order_id = ?",
+      [ntp_order_id]
+    );
+
+    const remaining = ticketCount.count - existing.count
+
+
+    const [event] = await db.query("SELECT id FROM events WHERE id = ?", [ntp_event_id]);
+    if (event.length === 0) return res.status(404).json({ message: "Event not found" });
+
+    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
+
+    if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
+
+    for (let i=0; i<remaining; i++) {
+      const ticket_id = `TKT-${nanoid(8)}`;
+
+      //THIS IS THE BASE64... we will convert this to image file and save locally for now
+      const qr = await QRCode.toDataURL(ticket_id);
+      //removes the prefix from the QR code string, cuz we dont need allat
+      const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+
+      const dir = path.join("public", "qr_codes");
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const filePath = path.join("public", "qr_codes", `${ticket_id}.png`);
+      fs.writeFileSync(filePath, base64Data, "base64"); //decode this base64 string into binary (real image) before saving
+
+      const qr_url = `${BASE_URL}/${FOLDER_URL}/${ticket_id}.png`;
+
+      //save to DB    
+      await db.query(
+        "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
+        [ticket_id, ntp_order_id, ntp_event_id, qr_url]
+      );
+    }   
+
+    return res.json({
+      ticket_id,
+      order_id: ntp_order_id,
+      event_id: ntp_event_id,
+      qr_url
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 //==============================================================
 const verifyTicket= async (req, res) => { //takes ticket_id and event_id
@@ -224,5 +291,6 @@ module.exports = {
   createOrder, 
   paymentRecord,
   generateTicket,
+  batchGenerateTicket,
   verifyTicket
 };

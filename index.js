@@ -1,6 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const { dbTesting, verifyTicket, dbNameTesting, generateTicket, createOrder, paymentRecord } = require('./ticketController');
+const { dbTesting, verifyTicket, dbNameTesting, generateTicket, createOrder, paymentRecord, batchGenerateTicket } = require('./ticketController');
 
 dotenv.config();
 
@@ -17,6 +17,7 @@ app.get('/dbnametest', dbNameTesting);
 app.post('/order/create', createOrder); //create order and record payment details... happens when user clicks checkout
 app.post('/payment/record', paymentRecord); //record payment details... happens when payment is successful, then you can update order status to 'paid'
 app.post('/ticket/generate', generateTicket); //create ticket and generate QR code... happens after payment is successful, you can generate ticket(s) linked to the order and event
+app.post('/ticket/batch/generate', batchGenerateTicket);  //several ticket generation
 app.post('/ticket/verify', verifyTicket); //verify if valid and used... happens when QR code is scanned at the event entrance, you can check if the ticket is valid and mark it as used
 
 app.get("/", (req, res) => res.send("Backend is running QR proj"));
