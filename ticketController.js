@@ -197,12 +197,12 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_order_id]
     );
 
-    const [[ existing ]] = await db.query(
-      "SELECT COUNT (*) as count FROM payments WHERE order_id = ?",
+    const [[ existingTickets ]] = await db.query(
+      "SELECT COUNT (*) as count FROM tickets WHERE order_id = ?",
       [ntp_order_id]
     );
 
-    const remaining = ticketCount.count - existing.count
+    const remaining = ticketCount.count - existingTickets.count
 
 
     const [event] = await db.query("SELECT id FROM events WHERE id = ?", [ntp_event_id]);
