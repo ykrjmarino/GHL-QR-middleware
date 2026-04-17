@@ -10,6 +10,7 @@
 const { db } = require('./db');
 const dotenv = require('dotenv');
 const QRCode = require("qrcode");
+const axios = require('axios');
 const { nanoid } = require('nanoid');
 const fs = require("fs");
 const path = require("path");
@@ -19,6 +20,11 @@ dotenv.config();
 const port = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${port}`;
 const FOLDER_URL = process.env.FOLDER_URL || "qr_codes";
+
+const LOCATION_ID = process.env.LOCATION_ID;
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const CUSTOMFIELD_QR_ID = process.env.CUSTOMFIELD_QR_ID;
+const CUSTOMFIELD_QR_KEY = process.env.CUSTOMFIELD_QR_KEY;
 
 //==============================================================
 //GET 
@@ -179,8 +185,11 @@ const generateTicket = async (req, res) => {
 
 const batchGenerateTicket = async (req, res) => {
   try {
-    const { ntp_event_id, ntp_order_id } = req.body.data;
-    const { ntp_quantity } = req.body.data; // kahit di na siguro
+    const { contact, custom_objects } = req.body.data;
+    const ntp_quantity = custom_objects.tickets.ntp_quantity;
+    const ntp_event_id = custom_objects.tickets.ntp_event_id;
+    const ntp_order_id = custom_objects.tickets.ntp_order_id;
+    const contact_id = contact.id;
 
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
@@ -204,7 +213,13 @@ const batchGenerateTicket = async (req, res) => {
 
     const remaining = ticketCount.count - existingTickets.count
 
+    console.log({
+      paymentCount: ticketCount.count,
+      existingCount: existingTickets.count,
+      remaining
+    });
 
+    //checking variables
     const [event] = await db.query("SELECT id FROM events WHERE id = ?", [ntp_event_id]);
     if (event.length === 0) return res.status(404).json({ message: "Event not found" });
 
@@ -212,6 +227,8 @@ const batchGenerateTicket = async (req, res) => {
 
     if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
 
+
+    const generatedTickets = [];
     for (let i=0; i<remaining; i++) {
       const ticket_id = `TKT-${nanoid(8)}`;
 
@@ -235,13 +252,66 @@ const batchGenerateTicket = async (req, res) => {
         "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
         [ticket_id, ntp_order_id, ntp_event_id, qr_url]
       );
+
+
+      
+
+      const searchPayload = {
+        locationId: LOCATION_ID,
+        page: 1,
+        pageLimit: 1, // only need 1 match
+        filters: [
+          {
+            field: `customFields.${CUSTOM_FIELD_ID}`,
+            operator: "eq",
+            value: contact_id
+          }
+        ]
+      };
+
+      //search if contact with this contact_id already exists in searchPayload
+      const searchResponse = await lcAPI.post('/contacts/search', searchPayload);
+      
+      console.log('source_contact_id:', source_contact_id);
+      const existingContact = searchResponse.data.contacts?.[0] || null;
+      console.log('Existing contact (from search):', existingContact);  
+
+      console.log(`Number ${i+1} Posted to Custom Field:`, qr_url); //testing
+      const updateData = {
+        firstName: contact.first_name,
+        lastName: contact.last_name,
+        name: contact.full_name || `${contact.first_name} ${contact.last_name}`,
+        ...(contact.email ? { email: contact.email } : {}),
+        ...(contact.phone ? { phone: contact.phone } : {}),
+        tags: mergedTags,
+        customFields: [
+          {
+            id: CUSTOMFIELD_QR_ID, 
+            key: CUSTOMFIELD_QR_KEY, //custom_objects.tickets.qr_code_url
+            field_value: contact_id //we will update the same contact, just add new qr url in custom field every loop
+          }
+        ]
+      };
+
+      const updateResponse = await lcAPI.put(`/contacts/${existingContact.id}`,updateData);
+
+      console.log('Updated Target-Account custom object contact:', updateResponse.data)
+
+      generatedTickets.push({ //para malabas sa loop, for json response
+        ticket_id,
+        order_id: ntp_order_id,
+        event_id: ntp_event_id,
+        qr_url
+      });
     }   
 
     return res.json({
-      ticket_id,
-      order_id: ntp_order_id,
-      event_id: ntp_event_id,
-      qr_url
+      // ticket_id,
+      // order_id: ntp_order_id,
+      // event_id: ntp_event_id,
+      // qr_url
+      count: generatedTickets.length,
+      tickets: generatedTickets
     });
   } catch (error) {
     console.error(error);
