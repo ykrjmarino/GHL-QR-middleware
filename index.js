@@ -20,7 +20,7 @@ app.post('/ticket/generate', generateTicket); //create ticket and generate QR co
 app.post('/ticket/batch/generate', batchGenerateTicket);  //several ticket generation
 app.post('/ticket/verify', verifyTicket); //verify if valid and used... happens when QR code is scanned at the event entrance, you can check if the ticket is valid and mark it as used
 
-app.get("/", (req, res) => res.send("Backend is running QR proj"));
+app.get("/", (req, res) => res.send("Backend is running QR proj")); 
 
 app.listen(port, () => {
   console.log(`✅ Backend running at http://localhost:${port} (ykrjm2026)`);
