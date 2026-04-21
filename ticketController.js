@@ -124,11 +124,17 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
 
 const generateTicket = async (req, res) => {
   try {
-    const { contact, custom_objects } = req.body.data;
+    // const { contact, custom_objects } = req.body.data;
+    //this if you want to get sa tickets object i think? not sure rn
     // const ntp_quantity = custom_objects.tickets.ntp_quantity;
-    const ntp_event_id = custom_objects.tickets.ntp_event_id;
-    const ntp_order_id = custom_objects.tickets.ntp_order_id;
-    const contact_id = contact.id;
+    // const ntp_event_id = custom_objects.tickets.ntp_event_id;
+    // const ntp_order_id = custom_objects.tickets.ntp_order_id;
+
+    //this one is if you want to get the data directly from webhook custom data
+    const contact = req.body
+    const ntp_event_id = contact.customData?.ntp_event_id;
+    const ntp_order_id = contact.customData?.ntp_order_id;
+    const contact_id = contact.contact_id;
     
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
@@ -229,11 +235,20 @@ const generateTicket = async (req, res) => {
 
 const batchGenerateTicket = async (req, res) => {
   try {
-    const { contact, custom_objects } = req.body.data;
+    // const { contact, custom_objects } = req.body.data;
     // const ntp_quantity = custom_objects.tickets.ntp_quantity;
-    const ntp_event_id = custom_objects.tickets.ntp_event_id;
-    const ntp_order_id = custom_objects.tickets.ntp_order_id;
-    const contact_id = contact.id;
+    // const ntp_event_id = custom_objects.tickets.ntp_event_id;
+    // const ntp_order_id = custom_objects.tickets.ntp_order_id;
+
+    // const ntp_event_id = contact.ntp_event_id;
+    // const ntp_order_id = contact.ntp_order_id;
+    // const contact_id = contact.id;
+
+    //this one working in webhook ad custom datas
+    const contact = req.body
+    const ntp_event_id = contact.customData?.ntp_event_id;
+    const ntp_order_id = contact.customData?.ntp_order_id;
+    const contact_id = contact.contact_id;
 
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
