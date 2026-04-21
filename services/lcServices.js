@@ -10,4 +10,6 @@ const lcAPI = axios.create({
   }
 });   
 
-export default lcAPI;
+module.exports = lcAPI;
+
+//not used

@@ -11,6 +11,7 @@ const { db } = require('./db');
 const dotenv = require('dotenv');
 const QRCode = require("qrcode");
 const axios = require('axios');
+//const lcAPI = require("./services/lcServices");
 const { nanoid } = require('nanoid');
 const fs = require("fs");
 const path = require("path");
@@ -186,7 +187,7 @@ const generateTicket = async (req, res) => {
 const batchGenerateTicket = async (req, res) => {
   try {
     const { contact, custom_objects } = req.body.data;
-    const ntp_quantity = custom_objects.tickets.ntp_quantity;
+    // const ntp_quantity = custom_objects.tickets.ntp_quantity;
     const ntp_event_id = custom_objects.tickets.ntp_event_id;
     const ntp_order_id = custom_objects.tickets.ntp_order_id;
     const contact_id = contact.id;
@@ -211,7 +212,20 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_order_id]
     );
 
+    const [event] = await db.query(
+      "SELECT id, event_name FROM events WHERE id = ?",  //add event_name here
+      [ntp_event_id]
+    );
+
     const remaining = ticketCount.count - existingTickets.count
+
+    if (remaining <= 0) {
+      return res.status(200).json({
+        message: "No new tickets to generate",
+        count: 0,
+        tickets: []
+      });
+    }
 
     console.log({
       paymentCount: ticketCount.count,
@@ -220,17 +234,18 @@ const batchGenerateTicket = async (req, res) => {
     });
 
     //checking variables
-    const [event] = await db.query("SELECT id FROM events WHERE id = ?", [ntp_event_id]);
     if (event.length === 0) return res.status(404).json({ message: "Event not found" });
 
     if (order.length === 0) return res.status(404).json({ message: "Order not found" });
 
     if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
 
-
     const generatedTickets = [];
+
+    //loop the tickets
     for (let i=0; i<remaining; i++) {
       const ticket_id = `TKT-${nanoid(8)}`;
+      console.log("ticket_id:", ticket_id);
 
       //THIS IS THE BASE64... we will convert this to image file and save locally for now
       const qr = await QRCode.toDataURL(ticket_id);
@@ -252,57 +267,50 @@ const batchGenerateTicket = async (req, res) => {
         "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
         [ticket_id, ntp_order_id, ntp_event_id, qr_url]
       );
+            //=================INSERTED THE DATA IN DATABASE=================//
 
 
-      
 
-      const searchPayload = {
-        locationId: LOCATION_ID,
-        page: 1,
-        pageLimit: 1, // only need 1 match
-        filters: [
+
+        //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
+      try {
+        const createResponse = await axios.post(
+          `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
           {
-            field: `customFields.${CUSTOM_FIELD_ID}`,
-            operator: "eq",
-            value: contact_id
-          }
-        ]
-      };
-
-      //search if contact with this contact_id already exists in searchPayload
-      const searchResponse = await lcAPI.post('/contacts/search', searchPayload);
-      
-      console.log('source_contact_id:', source_contact_id);
-      const existingContact = searchResponse.data.contacts?.[0] || null;
-      console.log('Existing contact (from search):', existingContact);  
-
-      console.log(`Number ${i+1} Posted to Custom Field:`, qr_url); //testing
-      const updateData = {
-        firstName: contact.first_name,
-        lastName: contact.last_name,
-        name: contact.full_name || `${contact.first_name} ${contact.last_name}`,
-        ...(contact.email ? { email: contact.email } : {}),
-        ...(contact.phone ? { phone: contact.phone } : {}),
-        tags: mergedTags,
-        customFields: [
+            locationId: LOCATION_ID,
+            properties: {
+              "ticket_id": String(ticket_id),
+              "qr_code_url": String(qr_url),
+              "order_id": String(ntp_order_id),
+              "event_id": String(ntp_event_id),
+              "event_name": String(event[0].event_name),
+            }
+          },
           {
-            id: CUSTOMFIELD_QR_ID, 
-            key: CUSTOMFIELD_QR_KEY, //custom_objects.tickets.qr_code_url
-            field_value: contact_id //we will update the same contact, just add new qr url in custom field every loop
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Version: '2021-07-28',
+              Authorization: `Bearer ${ACCESS_TOKEN}`
+            }
           }
-        ]
-      };
+        );
+        console.log("====================================================");
+        console.log("GHL create record success:", createResponse.data);
+      } catch (error) {
+        console.error(
+          "GHL create record failed:",
+          error.response?.data || error.message
+        );
+      }
 
-      const updateResponse = await lcAPI.put(`/contacts/${existingContact.id}`,updateData);
-
-      console.log('Updated Target-Account custom object contact:', updateResponse.data)
-
-      generatedTickets.push({ //para malabas sa loop, for json response
+      generatedTickets.push({
         ticket_id,
         order_id: ntp_order_id,
         event_id: ntp_event_id,
         qr_url
       });
+      
     }   
 
     return res.json({

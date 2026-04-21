@@ -108,6 +108,7 @@ INSERT INTO orders (order_ref, user_id, event_id, total_amount, payment_status) 
 INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref) VALUES
 (1, 'GCash', 500.00, 'paid', 'GC-TXN-000001'),
 (2, 'Maya', 1000.00, 'paid', 'MY-TXN-000002'),
+(2, 'Maya', 1000.00, 'paid', 'MY-TXN-000004'),
 (3, 'GCash', 1500.00, 'pending', 'GC-TXN-000003');
 
 -- //no need for this muna
