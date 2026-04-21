@@ -124,8 +124,12 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
 
 const generateTicket = async (req, res) => {
   try {
-    const { ntp_event_id, ntp_order_id } = req.body.data;
-
+    const { contact, custom_objects } = req.body.data;
+    // const ntp_quantity = custom_objects.tickets.ntp_quantity;
+    const ntp_event_id = custom_objects.tickets.ntp_event_id;
+    const ntp_order_id = custom_objects.tickets.ntp_order_id;
+    const contact_id = contact.id;
+    
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
       return res.status(400).json({ message: "Missing ntp_event_id or ntp_order_id" });
@@ -136,20 +140,27 @@ const generateTicket = async (req, res) => {
       [ntp_order_id]
     );
 
-    if (order.length === 0) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+    const [event] = await db.query(
+      "SELECT id, event_name FROM events WHERE id = ?",  //add event_name here
+      [ntp_event_id]
+    );
 
-    if (order[0].payment_status !== "paid") {
-      return res.status(400).json({ message: "Order not paid" });
-    }
+    const [[existingTicket]] = await db.query(
+      "SELECT id FROM tickets WHERE order_id = ?",
+      [ntp_order_id]
+    );
 
-    const [event] = await db.query("SELECT id FROM events WHERE id = ?", [ntp_event_id]);
-    if (event.length === 0) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    //checking variables
+    if (event.length === 0) return res.status(404).json({ message: "Event not found" });
+
+    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
+
+    if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
+
+    if (existingTicket) return res.status(400).json({ message: "Ticket already generated for this order" }); 
 
     const ticket_id = `TKT-${nanoid(8)}`;
+    console.log("ticket_id:", ticket_id);
 
     //THIS IS THE BASE64... we will convert this to image file and save locally for now
     const qr = await QRCode.toDataURL(ticket_id);
@@ -171,6 +182,38 @@ const generateTicket = async (req, res) => {
       "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
       [ticket_id, ntp_order_id, ntp_event_id, qr_url]
     );
+
+      //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
+    try {
+      const createResponse = await axios.post(
+        `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
+        {
+          locationId: LOCATION_ID,
+          properties: {
+            "ticket_id": String(ticket_id),
+            "qr_code_url": String(qr_url),
+            "order_id": String(ntp_order_id),
+            "event_id": String(ntp_event_id),
+            "event_name": String(event[0].event_name),
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Version: '2021-07-28',
+            Authorization: `Bearer ${ACCESS_TOKEN}`
+          }
+        }
+      );
+      console.log("====================================================");
+      console.log("GHL create record success:", createResponse.data);
+    } catch (error) {
+      console.error(
+        "GHL create record failed:",
+        error.response?.data || error.message
+      );
+    }
 
     return res.json({
       ticket_id,
@@ -202,12 +245,12 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_order_id]
     );
 
-    const [[ ticketCount ]] = await db.query(
+    const [[ticketCount]] = await db.query(
       "SELECT COUNT (*) as count FROM payments WHERE order_id = ?",
       [ntp_order_id]
     );
 
-    const [[ existingTickets ]] = await db.query(
+    const [[existingTickets]] = await db.query(
       "SELECT COUNT (*) as count FROM tickets WHERE order_id = ?",
       [ntp_order_id]
     );
