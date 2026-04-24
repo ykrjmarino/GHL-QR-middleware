@@ -96,28 +96,43 @@ const createOrder = async (req, res) => {
 
 const paymentRecord  = async (req, res) => { // payment = success ===>>> order paid
   try {
-    const { ntp_order_ref, ntp_amount, ntp_transaction_ref } = req.body.data; //or 'user info' {{contact.id??}} ghl side
-    const { ntp_provider = 'GHL' } = req.body.data; //use value if received, otherwise default to 'GHL'
+    const contact = req.body
+
+    const ntp_order_ref = contact.customData?.ntp_order_ref;
+    const ntp_amount = contact.customData?.ntp_amount;
+    const ntp_transaction_ref = contact.customData?.ntp_transaction_ref;
+    const ntp_provider = contact.customData?.ntp_provider || 'GHL';//use value if received, otherwise default to 'GHL'
+
+    if (!ntp_order_ref || !ntp_amount || !ntp_transaction_ref || !ntp_provider) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
     const [order] = await db.query(
       "SELECT id FROM orders WHERE order_ref = ?",
       [ntp_order_ref]
     );
 
+    const [existingPayment] = await db.query(
+      "SELECT id FROM payments WHERE transaction_ref = ?",
+      [ntp_transaction_ref]
+    );
+
     if (order.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
+      const order_id = order[0].id; 
+        //existing orders table primary key(PK) (id) = order.id
+        //will pass this to payments table as foreign key(FK)
 
-    const order_id = order[0].id; 
-          //existing orders table primary key(PK) (id) = order.id
-          //will pass this to payments table as foreign key(FK)
-
-    await db.query(
+    if (existingPayment.length > 0) {
+      return res.status(200).json({ message: "Payment already recorded", order_id });
+    }
+    await db.query( //update
       "UPDATE orders SET payment_status = 'paid' WHERE id = ?",
       [order_id]
     );
 
-    await db.query(
+    await db.query( //creation
       `INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref)
        VALUES (?, ?, ?, ?, ?)`,
       [order_id, ntp_provider, ntp_amount, 'paid', ntp_transaction_ref]
@@ -146,6 +161,9 @@ const generateTicket = async (req, res) => {
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_id = contact.customData?.ntp_order_id;
     const contact_id = contact.contact_id;
+
+    
+    const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
     
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
@@ -260,6 +278,8 @@ const batchGenerateTicket = async (req, res) => {
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_id = contact.customData?.ntp_order_id;
     const contact_id = contact.contact_id;
+    
+    const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
 
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_id) {
