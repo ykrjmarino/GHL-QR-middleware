@@ -64,12 +64,23 @@ const dbNameTesting = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { ntp_order_ref, ntp_user_id, ntp_total_amount } = req.body.data;
+    const contact = req.body
+
+    const ntp_order_ref = contact.customData?.ntp_order_ref;
+    const ntp_event_id = contact.customData?.ntp_event_id;
+    const ntp_total_amount = contact.customData?.ntp_total_amount;
+    const ntp_quantity = contact.customData?.ntp_quantity;
+    //const ntp_user_id = contact.customData?.ntp_user_id;
+    //const contact_id = contact.contact_id;
+
+    if (!ntp_order_ref || !ntp_event_id || !ntp_total_amount || !ntp_quantity) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
     const [result] = await db.query(
-      `INSERT INTO orders (order_ref, user_id, total_amount, payment_status)
-       VALUES (?, ?, ?, 'pending')`,
-      [ntp_order_ref, ntp_user_id, ntp_total_amount]
+      `INSERT INTO orders (order_ref, event_id, total_amount, quantity, payment_status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [ntp_order_ref, ntp_event_id, ntp_total_amount, ntp_quantity, 'pending']
     );
 
     return res.json({
@@ -108,8 +119,8 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
 
     await db.query(
       `INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref)
-       VALUES (?, ?, ?, 'paid', ?)`,
-      [order_id, ntp_provider, ntp_amount, ntp_transaction_ref]
+       VALUES (?, ?, ?, ?, ?)`,
+      [order_id, ntp_provider, ntp_amount, 'paid', ntp_transaction_ref]
     );
 
     return res.json({
@@ -244,7 +255,7 @@ const batchGenerateTicket = async (req, res) => {
     // const ntp_order_id = contact.ntp_order_id;
     // const contact_id = contact.id;
 
-    //this one working in webhook ad custom datas
+    //this one working in webhook and custom datas
     const contact = req.body
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_id = contact.customData?.ntp_order_id;
@@ -260,8 +271,8 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_order_id]
     );
 
-    const [[ticketCount]] = await db.query(
-      "SELECT COUNT (*) as count FROM payments WHERE order_id = ?",
+    const [[ticketCount]] = await db.query( //DITO YUNG MALIIII,,,, ONE PAYMENT ALWAYS FROM PAYMENT SO IT CANNOT BE MORE.. WE SHOULD HAVE QUANTITY FIELD!! 
+      "SELECT COUNT (*) as count FROM payments WHERE order_id = ? AND payment_status = 'paid'",
       [ntp_order_id]
     );
 
@@ -342,6 +353,7 @@ const batchGenerateTicket = async (req, res) => {
               "order_id": String(ntp_order_id),
               "event_id": String(ntp_event_id),
               "event_name": String(event[0].event_name),
+              //add buyer name
             }
           },
           {
