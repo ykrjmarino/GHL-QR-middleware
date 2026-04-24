@@ -85,6 +85,20 @@ CREATE TABLE payments (
     FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 
+===========alter table============
+-- add quantity to orders
+ALTER TABLE orders
+  ADD COLUMN quantity INT NOT NULL DEFAULT 1 AFTER event_id;
+
+-- remove the FK constraint from orders to contacts
+ALTER TABLE orders
+  DROP FOREIGN KEY `1`;
+
+-- remove user_id from orders
+ALTER TABLE orders
+  DROP COLUMN user_id;
+
+  
 ============== dummy data ==============
 -- 1. contacts first
 INSERT INTO contacts (name, email, phone) VALUES
@@ -99,9 +113,9 @@ INSERT INTO events (event_name, event_date, expires_at, location) VALUES
 ('Tech Summit PH', '2025-03-10 09:00:00', '2025-03-10 17:00:00', 'PICC, Pasay City');
 
 -- 3. orders (now includes event_id)
-INSERT INTO orders (order_ref, user_id, event_id, total_amount, payment_status) VALUES
-('ORDER-2025-001', 1, 1, 500.00, 'paid'),
-('ORDER-2025-002', 2, 2, 1000.00, 'paid'),
+INSERT INTO orders (order_ref, event_id, quantity, total_amount, payment_status) VALUES
+('ORDER-2025-001', 1, 2, 500.00, 'paid'),
+('ORDER-2025-002', 2, 1, 1000.00, 'paid'),
 ('ORDER-2025-003', 3, 3, 1500.00, 'pending');
 
 -- 4. payments
