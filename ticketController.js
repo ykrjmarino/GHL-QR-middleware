@@ -159,21 +159,25 @@ const generateTicket = async (req, res) => {
     //this one is if you want to get the data directly from webhook custom data
     const contact = req.body
     const ntp_event_id = contact.customData?.ntp_event_id;
-    const ntp_order_id = contact.customData?.ntp_order_id;
-    //const contact_id = contact.contact_id;
-
+    const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
+    
+    //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
     
     //check if data passed from req.body.data is existing
-    if (!ntp_event_id || !ntp_order_id || !ntp_buyer_name) {
+    if (!ntp_event_id || !ntp_order_ref || !ntp_buyer_name) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [order] = await db.query(
-      "SELECT payment_status FROM orders WHERE id = ?",
-      [ntp_order_id]
+      "SELECT id, payment_status, quantity FROM orders WHERE order_ref = ? AND payment_status = ?",
+      [ntp_order_ref, 'paid']
     );
+
+    if (order.length === 0) return res.status(404).json({ message: "Order not found/paid" });
+
+    const order_id = order[0].id;
 
     const [event] = await db.query(
       "SELECT id, event_name FROM events WHERE id = ?",  //add event_name here
@@ -182,15 +186,11 @@ const generateTicket = async (req, res) => {
 
     const [[existingTicket]] = await db.query(
       "SELECT id FROM tickets WHERE order_id = ?",
-      [ntp_order_id]
+      [order_id]
     );
 
     //checking variables
     if (event.length === 0) return res.status(404).json({ message: "Event not found" });
-
-    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
-
-    if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
 
     if (existingTicket) return res.status(400).json({ message: "Ticket already generated for this order" }); 
 
@@ -215,20 +215,19 @@ const generateTicket = async (req, res) => {
     //save to DB    
     await db.query(
       "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
-      [ticket_id, ntp_order_id, ntp_event_id, qr_url]
+      [ticket_id, order_id, ntp_event_id, qr_url]
     );
 
       //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
     try {
       const createResponse = await axios.post(
-        `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
+        `https://services.leadconnectorhq.com/objects/custom_objects.tickets_templ/records`,
         {
           locationId: LOCATION_ID,
           properties: {
             "ticket_id": String(ticket_id),
             "qr_code_url": String(qr_url),
-            "order_id": String(ntp_order_id),
-            "event_id": String(ntp_event_id),
+            "order_id": String(order_id),
             "event_name": String(event[0].event_name),
             "buyer_name": String(ntp_buyer_name),
           }
@@ -253,7 +252,7 @@ const generateTicket = async (req, res) => {
 
     return res.json({
       ticket_id,
-      order_id: ntp_order_id,
+      order_id: order_id,
       event_id: ntp_event_id,
       qr_url
     });
@@ -276,7 +275,6 @@ const batchGenerateTicket = async (req, res) => {
 
     //this one working in webhook and custom datas
     const contact = req.body
-    //const contact_id = contact.contact_id;
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
@@ -294,7 +292,7 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_order_ref, "paid"]
     );
 
-    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
+    if (order.length === 0) return res.status(404).json({ message: "Order not found/paid" });
 
     const order_id = order[0].id;
     const ticketQuantity = Number(order[0].quantity); //get quantity from orders table based on order_id
@@ -364,7 +362,8 @@ const batchGenerateTicket = async (req, res) => {
       try { //post in tickets
         const createResponse = await axios.post(
           `https://services.leadconnectorhq.com/objects/custom_objects.tickets_templ/records`,
-          { //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
+          { //before:: `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`
+            //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
             locationId: LOCATION_ID,
             properties: {
               "ticket_id": String(ticket_id),
