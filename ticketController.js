@@ -160,14 +160,14 @@ const generateTicket = async (req, res) => {
     const contact = req.body
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_id = contact.customData?.ntp_order_id;
-    const contact_id = contact.contact_id;
+    //const contact_id = contact.contact_id;
 
-    
+    const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
     
     //check if data passed from req.body.data is existing
-    if (!ntp_event_id || !ntp_order_id) {
-      return res.status(400).json({ message: "Missing ntp_event_id or ntp_order_id" });
+    if (!ntp_event_id || !ntp_order_id || !ntp_buyer_name) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [order] = await db.query(
@@ -230,6 +230,7 @@ const generateTicket = async (req, res) => {
             "order_id": String(ntp_order_id),
             "event_id": String(ntp_event_id),
             "event_name": String(event[0].event_name),
+            "buyer_name": String(ntp_buyer_name),
           }
         },
         {
@@ -275,30 +276,33 @@ const batchGenerateTicket = async (req, res) => {
 
     //this one working in webhook and custom datas
     const contact = req.body
+    //const contact_id = contact.contact_id;
     const ntp_event_id = contact.customData?.ntp_event_id;
-    const ntp_order_id = contact.customData?.ntp_order_id;
-    const contact_id = contact.contact_id;
-    
+    const ntp_order_ref = contact.customData?.ntp_order_ref;
+    const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
+
+    //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
 
     //check if data passed from req.body.data is existing
-    if (!ntp_event_id || !ntp_order_id) {
-      return res.status(400).json({ message: "Missing ntp_event_id or ntp_order_id" });
+    if (!ntp_event_id || !ntp_order_ref || !ntp_buyer_name) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [order] = await db.query(
-      "SELECT payment_status FROM orders WHERE id = ?",
-      [ntp_order_id]
+      "SELECT id, payment_status, quantity FROM orders WHERE order_ref = ? AND payment_status = ?",
+      [ntp_order_ref, "paid"]
     );
 
-    const [[ticketCount]] = await db.query( //DITO YUNG MALIIII,,,, ONE PAYMENT ALWAYS FROM PAYMENT SO IT CANNOT BE MORE.. WE SHOULD HAVE QUANTITY FIELD!! 
-      "SELECT COUNT (*) as count FROM payments WHERE order_id = ? AND payment_status = 'paid'",
-      [ntp_order_id]
-    );
+    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
+
+    const order_id = order[0].id;
+    const ticketQuantity = Number(order[0].quantity); //get quantity from orders table based on order_id
+    
 
     const [[existingTickets]] = await db.query(
       "SELECT COUNT (*) as count FROM tickets WHERE order_id = ?",
-      [ntp_order_id]
+      [order_id]
     );
 
     const [event] = await db.query(
@@ -306,7 +310,9 @@ const batchGenerateTicket = async (req, res) => {
       [ntp_event_id]
     );
 
-    const remaining = ticketCount.count - existingTickets.count
+    if (event.length === 0) return res.status(404).json({ message: "Event not found" });
+
+    const remaining = ticketQuantity - existingTickets.count
 
     if (remaining <= 0) {
       return res.status(200).json({
@@ -317,17 +323,10 @@ const batchGenerateTicket = async (req, res) => {
     }
 
     console.log({
-      paymentCount: ticketCount.count,
+      ticketQuantity,
       existingCount: existingTickets.count,
       remaining
     });
-
-    //checking variables
-    if (event.length === 0) return res.status(404).json({ message: "Event not found" });
-
-    if (order.length === 0) return res.status(404).json({ message: "Order not found" });
-
-    if (order[0].payment_status !== "paid") return res.status(400).json({ message: "Order not paid" });
 
     const generatedTickets = [];
 
@@ -354,7 +353,7 @@ const batchGenerateTicket = async (req, res) => {
       //save to DB    
       await db.query(
         "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
-        [ticket_id, ntp_order_id, ntp_event_id, qr_url]
+        [ticket_id, order_id, ntp_event_id, qr_url]
       );
             //=================INSERTED THE DATA IN DATABASE=================//
 
@@ -362,18 +361,17 @@ const batchGenerateTicket = async (req, res) => {
 
 
         //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
-      try {
+      try { //post in tickets
         const createResponse = await axios.post(
-          `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
-          {
+          `https://services.leadconnectorhq.com/objects/custom_objects.tickets_templ/records`,
+          { //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
             locationId: LOCATION_ID,
             properties: {
               "ticket_id": String(ticket_id),
               "qr_code_url": String(qr_url),
-              "order_id": String(ntp_order_id),
-              "event_id": String(ntp_event_id),
+              "order_id": String(order_id),
               "event_name": String(event[0].event_name),
-              //add buyer name
+              "buyer_name": String(ntp_buyer_name),
             }
           },
           {
@@ -386,17 +384,45 @@ const batchGenerateTicket = async (req, res) => {
           }
         );
         console.log("====================================================");
-        console.log("GHL create record success:", createResponse.data);
+        console.log("GHL create record in 'ticket' successful:", createResponse.data);
       } catch (error) {
         console.error(
-          "GHL create record failed:",
+          "GHL create record in 'ticket' failed:",
           error.response?.data || error.message
         );
       }
-
+/*
+      try { //post in events
+        const createResponse = await axios.post(
+          `https://services.leadconnectorhq.com/objects/custom_objects.events_templ/records`,
+          { //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
+            locationId: LOCATION_ID,
+            properties: {
+              "event_id": String(ntp_event_id),
+              "event_name": String(event[0].event_name),
+            }
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Version: '2021-07-28',
+              Authorization: `Bearer ${ACCESS_TOKEN}`
+            }
+          }
+        );
+        console.log("====================================================");
+        console.log("GHL create record in 'event' successful:", createResponse.data);
+      } catch (error) {
+        console.error(
+          "GHL create record in 'event' failed:",
+          error.response?.data || error.message
+        );
+      }
+*/
       generatedTickets.push({
         ticket_id,
-        order_id: ntp_order_id,
+        order_id: order_id,
         event_id: ntp_event_id,
         qr_url
       });
