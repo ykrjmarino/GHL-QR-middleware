@@ -91,8 +91,12 @@ ALTER TABLE orders
   ADD COLUMN quantity INT NOT NULL DEFAULT 1 AFTER event_id;
 
 -- remove the FK constraint from orders to contacts
+-- local heidiSQL
 ALTER TABLE orders
   DROP FOREIGN KEY `1`;
+-- hostinger
+ALTER TABLE orders
+  DROP FOREIGN KEY orders_ibfk_1;
 
 -- remove user_id from orders
 ALTER TABLE orders
@@ -132,3 +136,61 @@ INSERT INTO tickets (ticket_id, order_id, event_id, status, qr_url) VALUES
 ('TKT-2025-002', 2, 2, 'unused', 'http://localhost:8080/qr/TKT-2025-002'),
 ('TKT-2025-003', 2, 2, 'unused', 'http://localhost:8080/qr/TKT-2025-003'),
 ('TKT-2025-004', 3, 3, 'unused', 'http://localhost:8080/qr/TKT-2025-004');
+
+
+
+
+
+========== FINAL ============
+
+
+CREATE TABLE contacts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100) UNIQUE,
+    phone VARCHAR(30),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_name VARCHAR(150),
+    event_date DATETIME,
+    expires_at DATETIME,
+    location VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_ref VARCHAR(50) UNIQUE,
+    event_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    total_amount DECIMAL(10,2),
+    payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES events(id)
+);
+
+CREATE TABLE tickets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id VARCHAR(50) UNIQUE,
+    order_id INT NOT NULL,         -- one or more tickets can link to one order_id
+    event_id INT NOT NULL,
+    status ENUM('unused', 'used') DEFAULT 'unused',
+    qr_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    FOREIGN KEY (event_id) REFERENCES events(id)
+);
+
+CREATE TABLE payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    provider VARCHAR(50),
+    amount DECIMAL(10,2),
+    payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
+    transaction_ref VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+);
