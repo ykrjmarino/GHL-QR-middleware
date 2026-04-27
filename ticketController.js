@@ -156,6 +156,7 @@ const generateTicket = async (req, res) => {
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
+    const ntp_prefix = contact.customData?.ntp_prefix || 'TKTpro'; //optional... default to 'TKTpro'
     
     //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
@@ -189,7 +190,7 @@ const generateTicket = async (req, res) => {
 
     if (existingTicket) return res.status(400).json({ message: "Ticket already generated for this order" }); 
 
-    const ticket_id = `TKT-${nanoid(8)}`;
+    const ticket_id = `${ntp_prefix}${nanoid(8)}`;
     console.log("ticket_id:", ticket_id);
 
     //THIS IS THE BASE64... we will convert this to image file and save locally for now
@@ -273,6 +274,7 @@ const batchGenerateTicket = async (req, res) => {
     const ntp_event_id = contact.customData?.ntp_event_id;
     const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
+    const ntp_prefix = contact.customData?.ntp_prefix || 'TKTpro'; //optional... default to 'TKTpro'
 
     //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
@@ -325,7 +327,7 @@ const batchGenerateTicket = async (req, res) => {
 
     //loop the tickets
     for (let i=0; i<remaining; i++) {
-      const ticket_id = `TKT-${nanoid(8)}`;
+      const ticket_id = `${ntp_prefix}${nanoid(8)}`;
       console.log("ticket_id:", ticket_id);
 
       //THIS IS THE BASE64... we will convert this to image file and save locally for now
