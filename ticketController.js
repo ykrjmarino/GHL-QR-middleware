@@ -103,18 +103,13 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
     const ntp_transaction_ref = contact.customData?.ntp_transaction_ref;
     const ntp_provider = contact.customData?.ntp_provider || 'GHL';//use value if received, otherwise default to 'GHL'
 
-    if (!ntp_order_ref || !ntp_amount || !ntp_transaction_ref || !ntp_provider) {
+    if (!ntp_order_ref || !ntp_amount || !ntp_provider) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [order] = await db.query(
-      "SELECT id FROM orders WHERE order_ref = ?",
+      "SELECT id, payment_status FROM orders WHERE order_ref = ?",
       [ntp_order_ref]
-    );
-
-    const [existingPayment] = await db.query(
-      "SELECT id FROM payments WHERE transaction_ref = ?",
-      [ntp_transaction_ref]
     );
 
     if (order.length === 0) {
@@ -124,7 +119,7 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
         //existing orders table primary key(PK) (id) = order.id
         //will pass this to payments table as foreign key(FK)
 
-    if (existingPayment.length > 0) {
+    if (order[0].payment_status === 'paid') {
       return res.status(200).json({ message: "Payment already recorded", order_id });
     }
     await db.query( //update
@@ -135,7 +130,7 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
     await db.query( //creation
       `INSERT INTO payments (order_id, provider, amount, payment_status, transaction_ref)
        VALUES (?, ?, ?, ?, ?)`,
-      [order_id, ntp_provider, ntp_amount, 'paid', ntp_transaction_ref]
+      [order_id, ntp_provider, ntp_amount, 'paid', ntp_transaction_ref || null]
     );
 
     return res.json({
