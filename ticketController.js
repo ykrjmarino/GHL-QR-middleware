@@ -367,9 +367,10 @@ const batchGenerateTicket = async (req, res) => {
         //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
       try { //post in tickets
         const createResponse = await axios.post(
-          `https://services.leadconnectorhq.com/objects/custom_objects.tickets_templ/records`,
-          { //before:: `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`
-            //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
+          `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
+          { //before (we are now using it again lol):: `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`
+              //example key from obj fields {{ custom_objects.tickets_templ.ticket_id }}
+              //https://services.leadconnectorhq.com/objects/custom_objects.tickets_templ/records
             locationId: LOCATION_ID,
             properties: {
               "ticket_id": String(ticket_id),
