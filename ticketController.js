@@ -77,6 +77,15 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    const [event] = await db.query(
+      "SELECT id FROM events WHERE id = ?",
+      [ntp_event_id]
+    );
+
+    if (event.length === 0) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
     const [result] = await db.query(
       `INSERT INTO orders (order_ref, event_id, total_amount, quantity, payment_status)
        VALUES (?, ?, ?, ?, ?)`,
