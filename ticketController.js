@@ -166,6 +166,7 @@ const generateTicket = async (req, res) => {
     const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
     const ntp_prefix = contact.customData?.ntp_prefix || 'TKTpro'; //optional... default to 'TKTpro'
+    const ntp_batch_id = contact.customData?.ntp_batch_id;
     
     //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
@@ -235,6 +236,8 @@ const generateTicket = async (req, res) => {
             "order_id": String(order_id),
             "event_name": String(event[0].event_name),
             "buyer_name": String(ntp_buyer_name),
+            "batch_id": String(ntp_batch_id),
+            "order_reference": String(ntp_order_ref)
           }
         },
         {
@@ -284,6 +287,7 @@ const batchGenerateTicket = async (req, res) => {
     const ntp_order_ref = contact.customData?.ntp_order_ref;
     const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
     const ntp_prefix = contact.customData?.ntp_prefix || 'TKTpro'; //optional... default to 'TKTpro'
+    const ntp_batch_id = contact.customData?.ntp_batch_id;
 
     //not needed for now, we can do this in workflow (add tag)
     const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
@@ -378,6 +382,8 @@ const batchGenerateTicket = async (req, res) => {
               "order_id": String(order_id),
               "event_name": String(event[0].event_name),
               "buyer_name": String(ntp_buyer_name),
+              "batch_id": String(ntp_batch_id),
+              "order_reference": String(ntp_order_ref)
             }
           },
           {
