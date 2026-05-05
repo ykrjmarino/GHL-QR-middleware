@@ -74,7 +74,15 @@ const createOrder = async (req, res) => {
     //const contact_id = contact.contact_id;
 
     if (!ntp_order_ref || !ntp_event_id || !ntp_total_amount || !ntp_quantity) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({ 
+        message: "Missing required fields",
+        received: {
+          ntp_order_ref: ntp_order_ref || null,
+          ntp_event_id: ntp_event_id || null,
+          ntp_total_amount: ntp_total_amount || null,
+          ntp_quantity: ntp_quantity || null
+        }
+      });
     }
 
     const [event] = await db.query(
@@ -95,7 +103,7 @@ const createOrder = async (req, res) => {
     if (existing.length > 0) {
       return res.status(200).json({ message: "Order already exists", order_id: existing[0].id });
     }
-    
+
     const [result] = await db.query(
       `INSERT INTO orders (order_ref, event_id, total_amount, quantity, payment_status)
        VALUES (?, ?, ?, ?, ?)`,
