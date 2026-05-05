@@ -131,7 +131,14 @@ const paymentRecord  = async (req, res) => { // payment = success ===>>> order p
     const ntp_provider = contact.customData?.ntp_provider || 'GHL';//use value if received, otherwise default to 'GHL'
 
     if (!ntp_order_ref || !ntp_amount || !ntp_provider) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({ 
+        message: "Missing required fields",
+        received: {
+          ntp_order_ref: ntp_order_ref || null,
+          ntp_amount: ntp_amount || null,
+          ntp_provider: ntp_provider || null
+        }
+      });
     }
 
     const [order] = await db.query(
@@ -191,7 +198,13 @@ const generateTicket = async (req, res) => {
     
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_ref || !ntp_buyer_name) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({ message: "Missing required fields",
+        received: {
+          ntp_event_id: ntp_event_id || null,
+          ntp_order_ref: ntp_order_ref || null,
+          ntp_buyer_name: ntp_buyer_name || null
+        }
+      });
     }
 
     const [order] = await db.query(
@@ -312,7 +325,13 @@ const batchGenerateTicket = async (req, res) => {
 
     //check if data passed from req.body.data is existing
     if (!ntp_event_id || !ntp_order_ref || !ntp_buyer_name) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({ message: "Missing required fields",
+        received: {
+          ntp_event_id: ntp_event_id || null,
+          ntp_order_ref: ntp_order_ref || null,
+          ntp_buyer_name: ntp_buyer_name || null
+        }
+      });
     }
 
     const [order] = await db.query(
