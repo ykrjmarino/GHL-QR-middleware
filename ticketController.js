@@ -86,6 +86,16 @@ const createOrder = async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
+    //guard against duplicate order_ref
+    const [existing] = await db.query(
+      "SELECT id FROM orders WHERE order_ref = ?",
+      [ntp_order_ref]
+    );
+
+    if (existing.length > 0) {
+      return res.status(200).json({ message: "Order already exists", order_id: existing[0].id });
+    }
+    
     const [result] = await db.query(
       `INSERT INTO orders (order_ref, event_id, total_amount, quantity, payment_status)
        VALUES (?, ?, ?, ?, ?)`,
