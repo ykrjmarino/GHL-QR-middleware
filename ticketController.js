@@ -492,6 +492,165 @@ const batchGenerateTicket = async (req, res) => {
   }
 };
 
+const batchGenerateTicketv2 = async (req, res) => { //posting one time in GHL but with separators in ticket id and URL to identify different tickets in the same order/batch
+  try {
+    //this one working in webhook and custom datas
+    const contact = req.body
+    const ntp_event_id = contact.customData?.ntp_event_id;
+    const ntp_order_ref = contact.customData?.ntp_order_ref;
+    const ntp_buyer_name = contact.customData?.ntp_buyer_name || 'TicketingPro Customer';
+    const ntp_prefix = contact.customData?.ntp_prefix || 'TKTpro'; //optional... default to 'TKTpro'
+    const ntp_batch_id = contact.customData?.ntp_batch_id;
+    const ntp_buyer_email = contact.customData?.ntp_buyer_email;
+
+    //not needed for now, we can do this in workflow (add tag)
+    const ntp_triggered_tag = contact.customData?.triggered_tag || 'TicketingProDefault';
+
+    //check if data passed from req.body.data is existing
+    if (!ntp_event_id || !ntp_order_ref || !ntp_buyer_name || !ntp_buyer_email || !ntp_batch_id) {
+      return res.status(400).json({ message: "Missing required fields",
+        received: {
+          ntp_event_id: ntp_event_id || null,
+          ntp_order_ref: ntp_order_ref || null,
+          ntp_buyer_name: ntp_buyer_name || null,
+          ntp_buyer_email: ntp_buyer_email || null,
+          ntp_batch_id: ntp_batch_id || null
+        }
+      });
+    }
+
+    const [order] = await db.query(
+      "SELECT id, payment_status, quantity, total_amount FROM orders WHERE order_ref = ? AND payment_status = ?",
+      [ntp_order_ref, "paid"]
+    );
+
+    if (order.length === 0) return res.status(404).json({ message: "Order not found/paid" });
+
+    const order_id = order[0].id;
+    const ticketQuantity = Number(order[0].quantity); //get quantity from orders table based on order_id
+    const totalAmount = Number(order[0].total_amount); //get total amount from orders table based on order_id
+
+    const [[existingTickets]] = await db.query(
+      "SELECT COUNT (*) as count FROM tickets WHERE order_id = ?",
+      [order_id]
+    );
+
+    const [event] = await db.query(
+      "SELECT id, event_name FROM events WHERE id = ?",  //add event_name here
+      [ntp_event_id]
+    );
+
+    if (event.length === 0) return res.status(404).json({ message: "Event not found" });
+
+    const remaining = ticketQuantity - existingTickets.count
+
+    if (remaining <= 0) {
+      return res.status(200).json({
+        message: "No new tickets to generate",
+        count: 0,
+        tickets: []
+      });
+    }
+
+    console.log({
+      ticketQuantity,
+      existingCount: existingTickets.count,
+      remaining
+    });
+
+    const generatedTickets = [];
+
+    //loop the tickets
+    for (let i=0; i<remaining; i++) {
+      const ticket_id = `${ntp_prefix}${nanoid(8)}`;
+      console.log("ticket_id:", ticket_id);
+
+      //THIS IS THE BASE64... we will convert this to image file and save locally for now
+      const qr = await QRCode.toDataURL(ticket_id);
+      //removes the prefix from the QR code string, cuz we dont need allat
+      const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+
+      const dir = path.join("public", "qr_codes");
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const filePath = path.join("public", "qr_codes", `${ticket_id}.png`);
+      fs.writeFileSync(filePath, base64Data, "base64"); //decode this base64 string into binary (real image) before saving
+
+      const qr_url = `${BASE_URL}/${FOLDER_URL}/${ticket_id}.png`;
+
+      //save to DB    
+      await db.query(
+        "INSERT INTO tickets (ticket_id, order_id, event_id, qr_url) VALUES (?, ?, ?, ?)",
+        [ticket_id, order_id, ntp_event_id, qr_url]
+      );
+            //=================INSERTED THE DATA IN DATABASE=================//
+
+        //======================PUSH DATA OUTSIDE THE LOOP======================//
+      generatedTickets.push({
+        ticket_id,
+        order_id: order_id,
+        event_id: ntp_event_id,
+        qr_url
+      });
+    }   
+
+    const ticketIDs = generatedTickets.map(t => t.ticket_id).join(",");
+    const qrURLs = generatedTickets.map(t => t.qr_url).join(",");
+
+      //=================WILL NOW POST IN GHL OBJECT(TICKETS)=================//
+    try { //post in tickets
+      const createResponse = await axios.post(
+        `https://services.leadconnectorhq.com/objects/custom_objects.tickets/records`,
+        { 
+          locationId: LOCATION_ID,
+          properties: {
+            "ticket_id": ticketIDs, //already string format
+            "qr_code_url": qrURLs, //when we use join(), it becomes a string with separators
+            "order_id": String(order_id),
+            "event_name": String(event[0].event_name),
+            "buyer_name": String(ntp_buyer_name),
+            "buyer_email": String(ntp_buyer_email),
+            "batch_id": String(ntp_batch_id),
+            "order_reference": String(ntp_order_ref),
+            "total_order_quantity": ticketQuantity, //numerical in GHL
+            "total_amount": totalAmount //numerical in GHL so no need to convert to string
+          }
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Version: '2021-07-28',
+            Authorization: `Bearer ${ACCESS_TOKEN}`
+          }
+        }
+      );
+      console.log("====================================================");
+      console.log("GHL create record in 'ticket' successful:", createResponse.data);
+    } catch (error) {
+      console.error(
+        "GHL create record in 'ticket' failed:",
+        error.response?.data || error.message
+      );
+    }
+
+    return res.json({
+      // ticket_id,
+      // order_id: ntp_order_id,
+      // event_id: ntp_event_id,
+      // qr_url
+      count: generatedTickets.length,
+      tickets: generatedTickets
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 //==============================================================
 const verifyTicket= async (req, res) => { //takes ticket_id and event_id
   try {
@@ -535,5 +694,6 @@ module.exports = {
   paymentRecord,
   generateTicket,
   batchGenerateTicket,
+  batchGenerateTicketv2,
   verifyTicket
 };
