@@ -567,6 +567,11 @@ const batchGenerateTicketv2 = async (req, res) => { //posting one time in GHL bu
 
       //THIS IS THE BASE64... we will convert this to image file and save locally for now
       const qr = await QRCode.toDataURL(ticket_id);
+      //can do::: for better image quality
+      // const qr = await QRCode.toDataURL(ticket_id, {
+      //   width: 2000,
+      //   margin: 2,
+      // });
       //removes the prefix from the QR code string, cuz we dont need allat
       const base64Data = qr.replace(/^data:image\/png;base64,/, "");
 
